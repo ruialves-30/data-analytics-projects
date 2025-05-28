@@ -1,0 +1,899 @@
+---
+title: "Projeto Estatistica Computacional"
+author: "Rui Alves PG55577"
+date: "1 de Janeiro de 2025"
+output: 
+  html_document:
+    toc: true          # Gera o índice automático
+    toc_float: true    # Faz o índice flutuar ao longo da página (opcional)
+    number_sections: true  # Numera as seções automaticamente (opcional)
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# <span style="color:black;"> **Introdução**
+
+Neste relatório foi uilizada a base de dados Gym Members Exercise Dataset, do site kaggle (https://www.kaggle.com/datasets/valakhorasani/gym-members-exercise-dataset/data). Este teve como objetivo realizar uma análise detalhada da base de dados, proceder à análise exploratória dos dados das diferentes variáveis, relacioná-las entre si, assim como aferir qual a influência das mesmas numa variável que consideramos como resposta, realizar testes estatísticos no âmbito da inferência estatística e tirar conclusões sobre os mesmos.
+
+Neste trabalho pretendemos utilizar os conhecimentos obtidos neste semestre no âmbito das diferentes unidades curriculares presentes no Mestrado em Estatística para Ciência de Dados da Universidade do Minho, nomeadamente Fundamentos e Aplicações da Estatística e Inferência Estatística num âmbito mais teórico e Modelos Lineares e Estatística Computacional numa vertente mais prática com o software estaístico R.
+
+Nesta base de dados estão presentes cerca de 1000 observações sobre as rotinas de treino de membros de ginásios, assim como os seus atributos físicos e informações antropométricas pessoais. Também foram incluídos indicadores sobre medidas obtidas durante o treino (como as calorias gastas, que será a variável resposta) permitindo assim realizar um estudo detalhado sobre as diferentes variantes do treino e da saúde ao nível físico.
+
+Numa primeira fase irá ser mostrado como importar os dados para o software R e as transformações necessárias à base de dados que irá ser utilizada no projeto. Posto isto, irá será realizada uma análise exploratória das diferentes variáveis, procurando sempre relações entre as mesmas e realizar testes que comprovem o que parece verdadeiro nos gráficos mostrados. Na terceira e última fase, vamos considerar uma variável resposta e perceber qual a relação/influência que as outras variáveis têm na mesma.
+
+# <span style="color:black;"> **Importação de Dados e Base de Dados utilizada**
+
+O dataset utilizado foi obtido através do site Kaggle, tendo sido feito o download do ficheiro no formato ".csv". Para importar este dataset para o R, foi utilizada a função read.csv como mostra em baixo, depois de se ter definido a diretoria de trabalho correta onde se encontrava o ficheiro.
+
+```{r importing}
+setwd("C:/Users/afons/Documents/EC_R/projetogym")
+getwd() #confirmar se foi definido corretamente
+gym_ds <- read.csv(file = "gym_members_exercise_tracking.csv", header = T, sep = ",", dec = ".")
+```
+
+O passo seguinte foi realizar uma pequena introspeção inicial dos dados, nomeadamente, confirmar o número de observações e variáveis com o indicado no site de onde o dataset foi extraido. Também foi verificado se existiria algum valor não atrbuído (NA).
+
+Na tabela seguinte encontra-se a informação existente no site sobre cada variável do dataset.
+
+```{r tabela, echo=FALSE, warning=FALSE}
+# Instalar pacotes, se necessário
+library(kableExtra)
+library(rmarkdown)
+# Dados para a tabela
+tabela <- data.frame(
+  Variáveis = c("Age", "Gender", "Weight (kg)", "Height (m)", "Max_BPM", 
+                "Avg_BPM", "Resting_BPM", "Session_Duration (hours)", 
+                "Calories_Burned", "Workout_Type", "Fat_Percentage", 
+                "Water_Intake (liters)", "Workout_Frequency (days/week)", 
+                "Experience_Level", "BMI"),
+  `Descrição das Variáveis` = c(
+    "Idade do membro do ginásio",
+    "Género do membro do ginásio (Masculino ou Feminino)",
+    "Peso do membro em kilogramas",
+    "Altura do membro em metros",
+    "Valor máximo de batimentos por minuto no treino",
+    "Valor médio de batimentos por minuto no treino",
+    "Valor médio de batimentos por minuto em repouso antes do treino",
+    "Duração de cada sessão em horas",
+    "Total de calorias gastas em cada sessão em kcal",
+    "Tipo de treino efetuado (Cardio, Força, Yoga, HIIT)",
+    "Percentagem de gordura corporal do membro",
+    "Ingestão de água diária durante o treino",
+    "Número de treinos por semana",
+    "Nível de Experiência, iniciante, intermédio ou avançado",
+    "Indíce de Massa corporal, calculado através da altura e do peso"
+  ),
+  `Tipo de Variável` = c(
+    "Quantitativa", "Qualitativa", "Quantitativa", "Quantitativa", 
+    "Quantitativa", "Quantitativa", "Quantitativa", "Quantitativa", 
+    "Quantitativa", "Qualitativa", "Quantitativa", "Quantitativa", 
+    "Quantitativa", "Qualitativa", "Quantitativa"
+  )
+)
+
+# Gerar a tabela com kableExtra
+tabela %>%
+  kable("html", col.names = c("Variáveis", "Descrição das Variáveis", "Tipo de Variável")) %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover", "condensed"))
+```
+
+
+```{r old_ds}
+str(gym_ds)
+
+#identificar NAs
+colSums(is.na(gym_ds))
+```
+Verificamos que o dataset foi importado corretamente e não existe qualquer valor não atribuido (NA).
+
+
+Depois de verificar que o dataset tinha variáveis definidas de forma incorreta, utilizamos a função "transform" para criar um novo dataset a partir do antigo, com o tipo de variável certo.
+Este dataset irá ser sempre utilizado durante todo o relatório.
+
+```{r transforming_ds}
+#Redefinir tipo das variáveis
+gym_ds2 <- transform(gym_ds, Experience_Level = factor(gym_ds$Experience_Level),
+                     Gender = factor(gym_ds$Gender), Workout_Type = factor(gym_ds$Workout_Type))
+
+
+#Remover o dataset antigo para não criar conflitos
+rm(gym_ds)
+
+#Recodificação da variável categórica Nível de Experiência
+gym_ds2$Experience_Level <- factor(gym_ds2$Experience_Level,
+                                   levels = c("1", "2", "3"),
+                                   labels = c("Beginner", "Intermediate", "Expert"))
+
+attach(gym_ds2)
+summary(Experience_Level)
+```
+Assim sendo, já obtivemos o dataset que será utilizado no decorrer do projeto.
+
+Confirmar a dimensão e verificar o sumário das diferentes variáveis da base de dados.
+
+```{r ds}
+dim(gym_ds2)
+summary(gym_ds2)
+```
+
+
+# <span style="color:black;"> **Análise Exploratória de Dados e Inferência Estatística**
+
+Estas serão as bibliotecas utilizadas para realizar a análise da base dados, estão resumidas aqui para evitar carregar de novo a cada utilização de uma função de cada biblioteca.
+
+```{r libraries, results='hide', message=FALSE, warning=FALSE}
+library(ggplot2)
+library(DescTools)
+library(BSDA)
+library(ggcorrplot)
+library(lawstat)
+```
+Nesta fase do trabalho irá ser realizada uma análise exploratória dos dados e irão ser utilizados métodos de inferência estatística para chegar a conclusões sobre cada variável ou relações entre varáveis.
+
+## <span style="color:black;"> **Distribuição por Género**
+
+Foi utilizado um gráfico circular para representar a divisão do género na amostra, tendo sido apresentadas as respetivas percentagens ao lado.
+
+```{r Género}
+slice <- table(Gender)
+lbls <- c("Sexo Feminino", "Sexo Masculino")
+pct <- round(100*slice/sum(slice))
+lbls <- paste(lbls, pct)
+lbls <- paste (lbls, "%")
+pie(slice, col = c("lightpink", "lightblue"), labels = lbls)
+```
+
+## <span style="color:black;"> **Distribuição das Alturas por Género**
+
+Para estudar a variável altura foram realizados dois gráficos, um boxplot das alturas em função
+do género, que permite ter acesso direto aos quartis e à mediana referente a cada género, e um
+histograma, que permite uma melhor visualização da distribuição das diferentes alturas por género, tendo em conta os intervalos de altura definidos.
+
+```{r boxplot_alturas}
+boxplot(Height..m.~Gender, col = c("purple","blue"), xlab = "Género",
+        ylab = "Altura (m)")
+```
+A partir deste boxplot podemos identificar as diferentes medianas do sexo feminino e masculino (1.64m e 1.79m respetivamente),
+assim como os diferentes quartis e alturas mímimas e máximas.
+
+
+```{r histograma_alturas}
+ggplot(data = gym_ds2, aes(x = Height..m., fill = Gender)) + 
+  geom_histogram(position = "stack", width = 1, color = "black", alpha = 0.6, bins = 10,breaks = seq(1.50, 2.00, by = 0.05)) +
+  labs(title = "Histograma das Alturas por Género",
+       x = "Altura (m)",
+       y = "Frequência") +
+  theme_minimal() +
+  scale_fill_manual(values = c("purple","navyblue"))
+```
+
+A partir do histograma conseguimos categorizar as 973 observações em 10 intervalos de altura, dos 1.5m até aos 2m,
+com intervalos de 0.5m. Consequentemente conseguimos observar qual a classe modal total [1.65m, 1.70m) 
+e por género [1.50m, 1.55m) para o sexo feminino e [1.75m, 1.80m) para o sexo masculino. Também é possível observar que entre [1.55m, 1.80m) há quantidades razoáveis de observações dos dois géneros enquanto que nos outros intervalos apenas há maioritariamente de um dos sexos.
+
+## <span style="color:black;"> **Nível de Experiência**
+
+Nesta secção vai ser analisado como a amostra se divide pelos 3 níveis de experiência possíveis (Iniciante, Intermédio e Avançado) e se há diferenças significativas no nível de experiência por género.
+
+```{r nivel_exp}
+summary(Experience_Level)
+table(Experience_Level, Gender)
+```
+
+### <span style="color:black;"> **Nível de Experiência por Género (Frequência Absoluta)**
+
+Neste histograma podemos observar a informação dada na tabela do nível de experiência por género na alínea anterior. O nível intermédio é o nível com maior frequência, seguido do nível iniciante e no final o nível avançado.
+
+```{r nivel_exp_Género_freq_absoluta}
+ggplot(gym_ds2, aes(x = Experience_Level, fill = Gender)) +
+  geom_bar(position = "dodge", width = 0.9, color = "black") +
+  labs(title = "Distribuicao do Nivel de Experiência por Género",
+       x = "Nivel de Experiência",
+       y = "Frequência") +
+  theme_minimal() +
+  scale_fill_manual(values = c("pink", "blue"))
+```
+
+### <span style="color:black;"> **Proporção do Nível de Experiência por Género**
+
+Neste histograma encontram-se na mesma os níveis de experiência divididos pelos dois géneros, no entanto no eixo das ordenadas são colocadas as frequências relativas, permitindo comparar as proporções do Nível de Experiência dentro de cada género.
+Os níveis de experiência (Iniciante, Intermédio e Avançado) serão representados por 3 cores diferentes (verde, amarelo e vermelho, respetivamente).
+
+```{r nivel_exp_Género_prop}
+ggplot(gym_ds2, aes(x = Gender, fill = Experience_Level)) +
+  geom_bar(position = "fill", width = 0.9, color = "black") +
+  labs(title = "Proporcao dos Nivel de Experiência por Género",
+       x = "Género",
+       y = "Frequência") +
+  theme_minimal() +
+  scale_fill_manual(values = c("green", "yellow", "red"))
+
+```
+
+Vamos averiguar se a proporção de utilizadores iniciantes, intermédios e avançados é igual nos dois géneros. Pelo gráfico parece que sim, vamos testar:
+
+Teste de proporção:
+
+\( H_0: \text{prop}_{\text{Beginner(Male)}} = \text{prop}_{\text{Beginner(Female) }}\  Vs
+ H_1: \text{prop}_{\text{Beginner(Male)}} \neq \text{prop}_{\text{Beginner(Female)}}\ \)
+
+\( H_0: \text{prop}_{\text{Intermediate(Male)}} = \text{prop}_{\text{Intermediate(Female) }}\  Vs
+ H_1: \text{prop}_{\text{Intermediate(Male)}} \neq \text{prop}_{\text{Intermediate(Female)}}\ \)
+
+\( H_0: \text{prop}_{\text{Expert(Male)}} = \text{prop}_{\text{Expert(Female )}}\  Vs
+ H_1: \text{prop}_{\text{Expert(Male)}} \neq \text{prop}_{\text{Expert(Female)}}\ \)
+
+```{r prop_teste}
+beginner <- table(Experience_Level=="Beginner", Gender)
+prop.test(beginner[2,], colSums(beginner))
+
+int <- table(Experience_Level=="Intermediate", Gender)
+prop.test(int[2,], colSums(int))
+
+expert <- table(Experience_Level=="Expert", Gender)
+prop.test(expert[2,], colSums(expert))
+
+```
+
+Como podemos averiguar, os P_Value dos 3 testes são muito próximos de 1, pelo que podemos aceitar a hipótese nula e concluir que há evidência estatística que as proporções dos nível de experiência são iguais no género feminino e masculino.
+
+
+
+## <span style="color:black;"> **Tipo de Treino**
+
+Neste sub-tópico vamos abordar em mais detalhe como estão distribuidas as observações pelos diferentes tipos de treino. Estes (Cardio, HIIT, Força, Yoga) serão representados por 4 cores diferentes (azul, vermelho, verde e amarelo respetivamente).
+
+
+```{r tipo_treino}
+slice2 <- table(Workout_Type)
+lbls2 <- c("Cardio","HiiT",  "Forca", "Yoga")
+pct2 <- round(100*slice2/sum(slice2))
+lbls2 <- paste(lbls2, pct2)
+lbls2 <- paste (lbls2, "%")
+pie(slice2, col = c("skyblue", "red", "green", "yellow"), labels = lbls2)
+```
+
+O treino de força é o mais comum entre todos os utilizadores com 27% das observações, seguindo-se o Cardio com 26%, depois a Yoga com 25% e por fim a modalidade HIIT com 23%.
+
+### <span style="color:black;"> **Tipo de Treino por Género**
+
+O gráfico a seguir representado é um histograma dos diferentes tipos de treino com as frequências separadas por género.
+
+```{r tipo_treino_Género}
+ggplot(data = gym_ds2, aes(x = Workout_Type, fill = Gender))+
+  geom_bar(color = "black", position = "dodge")+
+  labs(title = "Tipo de Treino por Género",
+       x = "Tipo de Treino",
+       y = "Frequência")+
+  theme_minimal()+
+  scale_fill_manual(values = c("purple","navyblue"))
+```
+
+Pela análise do gráfico podemos aferir que o tipo de treino mais comum no sexo feminino é o cardio, enquanto que no sexo masculino é o treino de força.
+
+O cardio é o tipo de treino onde as frequências absolutas se aproximam mais, enquanto que em Yoga são mais díspares. 
+
+O facto do número de observações do sexo masculino ser superior ao do sexo feminino em cada um dos tipos de treino pode ser explicado pelo facto de haver mais observações do sexo masculino (como foi mostrado em 3.1).
+
+## <span style="color:black;"> **Duração da Sessão (Tempo de Treino)**
+
+Agora iremos analisar a distribuição do tempo de treino, relacionando-o posteriormente com o nível de experiência do utilizador e o tipo de treino efetuado.
+
+```{r tempo_treino}
+summary(Session_Duration..hours.)
+hist(Session_Duration..hours., col = "lightblue", xlab = "Duração da Sessão (h)",
+     ylab = "Frequência", main = "Histograma da Duração da Sessão")
+```
+
+Através da observação do histograma podemos constatar que o intervalo onde a frequência de tempo de treino é maior é entre [1h, 1.5h) e que não houve nenhuma sessão de treino com duração inferior a 0.5h e superior a 2h. Estes dados são condizentes com os resultados obtidos no sumário, assim como a mediana ser 1.26h.
+
+### <span style="color:black;"> **Distribuição da Duração da Sessão por Nível de Experiência**
+Neste sub-tópico vamos relacionar a duração da sessão com o nível de experiência do utilizador. Vai ser apresentado um histograma onde os níveis de experiência (Iniciante, Intermédio e Avançado) serão representados por 3 cores diferentes (verde, amarelo e vermelho, respetivamente).
+
+```{r tempo_treino_exp}
+ggplot(data = gym_ds2, aes(x = Session_Duration..hours., fill = Experience_Level))+
+  geom_histogram(color="black", bins = 15, position = "stack", breaks = seq(0.5, 2, by = 0.1))+
+  labs(title = "Duração da Sessão por níveis de Experiência",
+       x = "Duração da Sessão (h)",
+       y = "Frequência")+
+  theme_minimal()+
+  scale_fill_manual(values = c("green", "yellow", "red"))
+
+ggplot(data = gym_ds2, aes(x = Experience_Level, y = Session_Duration..hours., fill = Experience_Level)) +
+  geom_boxplot(color = "black") +
+  labs(title = "Boxplot da Duração da Sessão por Níveis de Experiência",
+       x = "Nível de Experiência",
+       y = "Duração da Sessão (h)") +
+  theme_minimal() +
+  scale_fill_manual(values = c("green", "yellow", "red"))
+
+```
+
+Observamos no histograma e no boxplot que o tempo de treino é influenciado pela experiência do utilizador. Os utilizadores principiantes treinam entre 0.5h a 1.5h, os intermédios entre 0.9h a 1.5h e os utilizadores experientes entre 1.5h a 2.0h.
+
+O boxplot permite aferir que há diferenças consideráveis entre as medianas da duração da sessão em função do nível de experiência do utilizador.
+
+### <span style="color:black;"> **Distribuição da Duração da Sessão por Tipo de Treino**
+
+Neste sub-tópico vamos relacionar a duração da sessão com o tipo de treino do utilizador. Vai ser apresentado um histograma onde os tipos de treino (Cardio, HIIT, Strength, Yoga) serão representados por 4 cores diferentes (azul, vermelho, verde e amarelo respetivamente).
+
+
+```{r tempo_treino_tipo}
+ggplot(data = gym_ds2, aes(x = Session_Duration..hours., fill = Workout_Type))+
+  geom_histogram(color="black", bins = 15, position = "stack")+
+  labs(title = "Histograma da Duração da Sessão por tipo de treino",
+       x = "Duracao da Sessao (h)",
+       y = "Frequência")+
+  theme_minimal()+
+  scale_fill_manual(values = c("skyblue", "red", "green", "yellow"))
+
+ggplot(data = gym_ds2, aes(x = Workout_Type, y = Session_Duration..hours., fill = Workout_Type)) +
+  geom_boxplot(color = "black") +
+  labs(title = "Boxplot da Duração da Sessão por Tipo de Treino",
+       x = "Tipo de Treino",
+       y = "Duração da Sessão (h)") +
+  theme_minimal() +
+  scale_fill_manual(values = c("skyblue", "red", "green", "yellow"))
+```
+
+Para verificarmos se o valor médio da duração da sessão é igual nos 4 tipos de treino diferentes tentaremos utilizar a ANOVA para realizar o seguinte teste:
+
+\( H_0: \mu_{\text{Cardio}} = \mu_{\text{HIIT}} = \mu_{\text{Strength}} = \mu_{\text{Yoga}} \) Vs
+\( H_1: \text{Há diferenças no valor médio da duração da sessão nos diferentes tipos de treino} \)
+
+
+Verificar a normalidade:
+
+\( H_0: \text{São proveniente de distribuição normal} \) Vs \( H_1: \text{Não são proveniente de distribuição normal}\)
+
+```{r normalidade_tempo_treino}
+LillieTest(Session_Duration..hours.[Workout_Type=="Cardio"])
+LillieTest(Session_Duration..hours.[Workout_Type=="HIIT"]) 
+LillieTest(Session_Duration..hours.[Workout_Type=="Strength"])
+LillieTest(Session_Duration..hours.[Workout_Type=="Yoga"])
+```
+
+Como o P_Value do treino de força é igual a 0.0037 < 0.05 não podemos aceitar H0 pelo que não provém de distribuição normal.
+
+Neste caso temos de recorrer à alternativa não paramétrica, o teste de Kruskal-Wallis.
+
+Temos de verificar o pressuposto das formas idênticas:
+
+```{r kruskal_wallis_pressuposto1}
+par(mfrow = c(2, 2), mar = c(4, 4, 2, 1)) # 2x2 layout, margens ajustadas
+
+hist(Session_Duration..hours.[Workout_Type=="Cardio"], col = "skyblue", xlim = c(0, 2.5),
+     xlab = "Duração da sessão", ylim = c(0, 90),
+     main = "Duração da sessão em Cardio", ylab = "Frequência")
+hist(Session_Duration..hours.[Workout_Type=="Strength"], col = "green", xlim = c(0, 2.5),
+     xlab = "Duração da sessão", ylim = c(0, 90),
+     main = "Duração da sessão em Força", ylab = "Frequência")
+hist(Session_Duration..hours.[Workout_Type=="HIIT"], col = "red", xlim = c(0, 2.5),
+     xlab = "Duração da sessão", ylim = c(0, 90),
+     main = "Duração da sessão em HIIT", ylab = "Frequência")
+hist(Session_Duration..hours.[Workout_Type=="Yoga"], col = "yellow", xlim = c(0, 2.5),
+     xlab = "Duração da sessão", ylim = c(0, 90),
+     main = "Duração da sessão em Yoga", ylab = "Frequência")
+```
+
+Podemos considerar que as formas são idênticas, vamos realizar então o teste de Kruskal-Wallis.
+
+```{r kruskal_wallis1}
+kruskal.test(Session_Duration..hours., Workout_Type)
+```
+
+Como o P_Value = 0.267 > 0.05, podemos aceitar a hipótese nula e concluir que, para um grau de confiança de 95%, há evidência estatística que os valores médios da duração da sessão são iguais para os 4 diferentes tipos de treino.
+
+## <span style="color:black;"> **Índice de Massa Corporal (IMC)**
+
+Este dataset possui informação sobre o IMC de cada indivíduo. O IMC é obtido através do quociente entre o peso e o quadrado da altura. Como este dataset também possui as variáveis altura e peso de cada indivíduo podemos averiguar se a variável IMC foi calculada corretamente.
+Para isso foi criado um vetor com os valores do IMC calculados através dos valores de peso e da altura, arredondados a duas casas decimais, ou seja, com os mesmos algarismos significativos que os valores já existentes na tabela.
+
+
+```{r imc_check}
+BMI_check <- round(Weight..kg./(Height..m.^2),2)
+unique(BMI - BMI_check)
+which((BMI - BMI_check)!=0) 
+```
+
+Através da diferença entre a variável IMC já proveniente do dataset e a que calculamos seria de esperar que o único valor existente seria 0. No entanto, descobrimos que a observação número 543 tem uma diferença de -0.01 pelo que terá havido um erro no cálculo (provavelmente no arredondamento) no valor proveninete da tabela.
+
+### <span style="color:black;"> **Categorizar o IMC**
+
+Segunda a Organização Mundial da Saúde (OMS) o IMC pode ser categorizado segundo diferentes níveis mundialmente estabelecidos. Foi construido um histograma cujas classes do IMC foram criadas segundo as diretrizes da OMS, de modo a dividir o IMC da base de dados pelos níveis referidos.
+
+```{r imc_cat}
+BMI_categorized <- cut(BMI, c(-Inf, 18.5, 24.9, 29.9, 34.9, 39.9, +Inf),
+                       right = F,
+                       labels = c("Baixo Peso", "Eutrofia (Peso Adequado)", "Sobrepeso", "Obesidade Grau 1",
+                                  "Obesidade Grau 2", "Obesidade Extrema"))
+
+table(BMI_categorized)
+
+ggplot(data = gym_ds2,
+       aes(x = BMI_categorized, fill = BMI_categorized))+
+  geom_bar(width = 1, color = "black")+
+  labs (title = "Histograma de Categorias de IMC",
+        x = "Categoria de IMC",
+        y = "Frequência") +
+  theme_minimal() +
+  scale_x_discrete(labels = c("Baixo Peso", 
+                              "Eutrofia (Peso Adequado)", 
+                              "Sobrepeso", 
+                              "Obesidade Grau 1", 
+                              "Obesidade Grau 2", 
+                              "Obesidade Extrema")) +
+  scale_fill_manual(values = c("skyblue", "lightgreen", "orange", "yellow", "red", "darkred"))+
+  theme(axis.text.x = element_text(size = 10, angle = 45, hjust = 1))
+```
+
+Queremos averiguar se o valor médio do IMC da amostra corresponde ao ponto médio do intervalo de Peso Adequado (Eutrofia) 21.7kg/m^2. Utilizaremos um teste unilateral à direita pois a forma da população indicia uma assimetria positiva.
+
+Pretendemos testar então: 
+\( H_0: \mu_{\text{IMC}} = 21.7 \) Vs \( H_1: \mu_{\text{IMC}} > 21.7 \)
+
+Para saber que teste utilizar temos de verificar se a distribuição é proveniente de uma distribuição normal:
+\( H_0: \text{É proveniente de distribuição normal} \) Vs \( H_1: \text{Não é proveniente de distribuição normal}\)
+
+```{r}
+LillieTest(BMI)
+
+```
+P_value = 1.118e-7 < 0.05 logo não podemos assumir que provém de distribuição normal, temos de recorrer a um teste não paramétrico.
+
+Para podermos utilizar o teste de Wilcoxon temos de verificar o pressuposto da simetria, como podemos verificar pelo histograma do IMC antes apresentado, o gráfico apresenta uma assimetria positiva (cauda mais comprida à direita). Tendo em conta isto, não é possível utilizar o teste de Wilcoxon, pelo que iremos utilizar o teste do Sinal.
+
+```{r}
+SIGN.test(BMI, md = 21.7, alternative = "greater", conf.level = 0.95)
+
+```
+P_value = 2.2e-16 < 0.05 logo rejeitamos a hipótese nula e concluimos, para um grau de confiança de 95%, que o valor da mediana do IMC é superior a 21.7.
+
+## <span style="color:black;"> **Calorias Gastas**
+
+Esta irá ser a maior secção do projeto, onde iremos considerar as calorias gastas como a variável resposta e perceber se e como é influenciada pelas outras variáveis da base de dados.
+
+```{r calories}
+summary(Calories_Burned)
+hist(Calories_Burned, main = "Calorias Gastas por treino", xlab = "Calorias Gastas",
+     ylab = "Frequência", nclass = 15, col = "blue", xlim = c(70, 2000))
+boxplot(Calories_Burned, col = "blue")
+```
+
+Com este histograma conseguimos visualizar a distribuição da frequência das calorias gastas, aparentando possuir uma forma semelhante com a distribuição normal. Com o boxplot temos uma ideia dos quartis e da mediana da variável em questão, assim como a existência de alguns outliers (analisados numa alínea mais a frente).
+
+Verificar se a distribuição é proveniente de uma distribuição normal:
+\( H_0: \text{É proveniente de distribuição normal} \) Vs \( H_1: \text{Não é proveniente de distribuição normal}\)
+
+
+```{r calorias_normal}
+LillieTest(Calories_Burned)
+```
+
+Como P_Value = 0.0633 > 0.05, podemos assumir, para um grau de confiança de 95%, que a distribuição é proveniente de uma distribuição normal.
+
+Para perceber quais as variáveis que estariam mais correlacionadas com a variável calorias gastas construimos uma matriz de correlação, podendo deste modo ter uma melhor orientação sobre que relações estudar e testes efetuar.
+
+```{r mat_corr, fig.width=8, fig.height=8}
+corr_matrix <- cor(gym_ds2[, c("Weight..kg.", "Height..m.", "Max_BPM", "Avg_BPM", "Resting_BPM", 
+                               "Session_Duration..hours.", "Calories_Burned", "Fat_Percentage", 
+                               "Water_Intake..liters.", "Workout_Frequency..days.week.", "BMI")], use = "complete.obs")
+ggcorrplot(corr_matrix, lab = TRUE)
+```
+
+É de destacar a correlação positiva forte (p = 0.91) entre as Calorias Gastas e a Duração da Sessão e a correlação negativa moderada (p = -0.6) entre as Calorias Gastas e a percentagem de gordura), ambas tratadas com mais detalhe à frente no relatório.
+
+
+### <span style="color:black;"> **Relação entre Percentagem de Gordura e Calorias Gastas**
+
+Como a matriz de correlação indica uma correlação moderada negativa entre estas duas variáveis vamos tentar estabelecer um modelo linear entre as mesmas.
+
+```{r percentagem_gorgura_vs_calorias_gastas}
+plot(Calories_Burned ~ Fat_Percentage, xlab = "Percentagem de Gordura Corporal", ylab = "Calorias Gastas")
+summary(lm(Calories_Burned ~ Fat_Percentage, data = gym_ds2))
+abline(lm(Calories_Burned ~ Fat_Percentage, data = gym_ds2))
+```
+
+Concluimos que podemos expressar a relação entre as duas variáveis através do modelo linear: Calorias Gastas = 1555.576 - 26.030 (Percentagem de Gordura), obtemos um R^2 de 0.3571 o que significa que a 35,71% da variabilidade da variável dependente é explicada pelo modelo.
+
+Apesar do R^2 não ser muito elevado, é inegável o padrão visível no gráfico, para valores maiores de percentagem de gordura corporal o número de calorias gastas é menor.
+
+
+### <span style="color:black;"> **Relação entre Calorias Gastas, Peso e Género**
+
+Primeiro, neste sub-tópico, vai estar representado um gráfico de dispersão das Calorias Gastas pelo Peso de cada individúo (duas variáveis quantitativas contínuas) por género.
+
+```{r calorias_peso_Género}
+library(ggplot2)
+ggplot(gym_ds2, aes(x = Weight..kg., y = Calories_Burned, color = Gender)) +
+  geom_point(size = 3) +
+  labs(title = "Peso vs Calorias Gastas por Género", x = "Peso (kg)", y = "Calorias Gastas") +
+  theme_minimal()
+
+```
+
+Ao observar este gráfico parece que podemos constatar que há uma banda de pesos, para cada um dos géneros, onde as calorias gastas são superiores, cerca de 60kg para o género feminino e 85kg para o género masculino.
+
+No entanto ao realizar o gráfico de dispersão seguinte (Calorias Gastas por Peso por nível de Experiência) aferimos que esse número de calorias gastas elevado não se deve explicitamente ao peso mas sim ao nível de experiência do utilizador.
+
+```{r calorias_peso_nivelexp}
+library(ggplot2)
+ggplot(gym_ds2, aes(x = Weight..kg., y = Calories_Burned, color = Experience_Level)) +
+  geom_point(size = 3) +
+  labs(title = "Peso vs Calorias Gastas por Nível de Experiência", x = "Peso (kg)", y = "Calorias Gastas(kcal)") +
+  theme_minimal()
+```
+
+Os gráficos de dispersão com 3 variáveis podem parecer indicar relações claras, no entanto é necessário ter sentido crítico e explorar outras variáveis que possam também ter influência, para no final não tirar conclusões precipitadas. 
+
+Vamos investigar de forma mais detalhada a relação entre as Calorias Gastas e o Género.
+
+```{r calorias_Género}
+ggplot(gym_ds2, aes(x = Gender, y = Calories_Burned, fill = Gender)) +
+  geom_boxplot() +
+  labs(title = "Calorias Gastas por género", x = "Género", y = "Calorias Gastas") +
+  theme_minimal()+
+  scale_fill_manual(values = c( "pink","skyblue"))
+```
+
+Pela observação do boxplot parece que a mediana das calorias gastas é bastante semelhante nos dois géneros. Por isso vamos realizar o teste para comparar se o valor médio de calorias gastas nos homens é igual ao valor médio de calorias gastas nas mulheres:
+
+\( H_0: \mu_M = \mu_F \) Vs \( H_1: \mu_M > \mu_F\)
+
+Para saber que teste utilizar temos de testar se as distribuições são provenientes da distribuição normal:
+
+\( H_0: \text{É proveniente de distribuição normal} \) Vs \( H_1: \text{Não é proveniente de distribuição normal}\)
+
+```{r normal}
+LillieTest(Calories_Burned[Gender=="Male"])
+LillieTest(Calories_Burned[Gender=="Female"])
+```
+
+Como ambos os P_Value são superiores a 0.05 podemos afirmar, para um grau de confiança de 95% que ambas as distribuições são provenientes da distribuição normal.
+
+Para saber qual o teste t correto a utilizar temos de testar se as variâncias são iguais:
+
+\( H_0: \text{Variâncias são iguais} \) Vs \( H_1: \text{Variâncias não são iguais}\)
+
+```{r var_test}
+var.test(Calories_Burned[Gender=="Male"], Calories_Burned[Gender=="Female"])
+
+```
+
+Como P_Value = 0.0025 < 0.05 rejeitamos H0 e assumimos que as variâncias são diferentes, para um grau de confiança de 95%.
+
+Já podemos realizar o test t:
+
+```{r t_test}
+t.test(Calories_Burned[Gender=="Male"], Calories_Burned[Gender=="Female"],
+       alternative = "greater", var.equal = F, conf.level = 0.95)
+```
+
+Como P_Value = 1e-6 < 0.05, logo rejeitamos H0, o valor médio de calorias gasto nos homens é superior ao valor médio de calorias gasto nas mulheres. No IC para 95% de confiança apenas constam valores positivos, pelo que corrobora a conclusão obtida.
+
+### <span style="color:black;"> **Relação entre Calorias Gastas e a duração da Sessão**
+
+Como tinhamos averiguado na matriz de correlação, é de esperar que as calorias gastas e a duração da sessão de treino se correlacionem de forma linear positiva e forte. Para testar isso vamos construir o modelo linear.
+
+```{r calorias_duracao_sessao}
+plot(Calories_Burned ~ Session_Duration..hours., xlab = "Duracao do Treino (h)", ylab = "Calorias Gastas (kcal)")
+model <- lm(Calories_Burned ~ Session_Duration..hours., data = gym_ds2)
+summary(model)
+abline(model) 
+```
+
+Modelo: Calorias Gastas = -1.446 + 721.786 (Duração da Sessão)
+
+No sumário do modelo temos de forma indireta o teste se B1 = 0 (equivalente a testar se as variáveis não possuem correlação linear).
+
+\( H_0: B_1 = 0 \) Vs \( H_1: B_1 \neq 0\)
+
+Como p_value < 2e-16 < 0.05, logo para 95% de GC há evidências que B1 não é nulo, pelo que há uma correlação linear entre as duas variáveis.
+R^2 = 0.82, logo o modelo explica 82% da variabilidade das Calorias Gastas.
+
+Será mostrado agora o gráfico das calorias gastas vs a duração da sessão por género e os respetivos modelos de regressão.
+
+```{r calorias_duracao_sessao_Género}
+ggplot(gym_ds2, aes(x = Session_Duration..hours., y = Calories_Burned, color = Gender)) +
+  geom_point(size = 1) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Interação entre Duração da Sessão, Calorias Gastas e Género",
+       x = "Duração da Sessão (Horas)",
+       y = "Calorias Gastas(kcal)") +
+  theme_minimal()
+
+summary(lm(Calories_Burned[Gender=="Male"] ~ Session_Duration..hours.[Gender=="Male"], data = gym_ds2))
+summary(lm(Calories_Burned[Gender=="Female"] ~ Session_Duration..hours.[Gender=="Female"], data = gym_ds2))
+```
+
+Pelo gráfico observamos que o modelo linear do género masculino possui um declive ligeiramente superior, no entanto ambos os modelos são bastante semelhantes, com R^2 próximos de 85%, pelo que 85% da variabilidade das calorias gastas é explicada por cada um dos modelos distintos.
+
+De seguida está presente o gráfico das Calorias Gastas por tempo de treino (por nível de Experiência), apesar de já termos construído o modelo anteriormente conseguimos aferir que há uma diferença clara entre os 3 níveis de experiência neste âmbito.
+
+```{r calorias_duracao_sessao_nivel_exp}
+ggplot(gym_ds2, aes(x = Session_Duration..hours., y = Calories_Burned, color = Experience_Level)) +
+  geom_point(alpha = 0.6) +
+  labs(title = "Interacao entre Duração da Sessão, Calorias Gastas e Nivel de Experiência",
+       x = "Duração da Sessão (Horas)",
+       y = "Calorias Gastas") +
+  theme_minimal()+
+  scale_color_manual(values = c("Beginner" = "green", "Intermediate" = "orange", "Expert" = "red"))
+```
+
+O mesmo não acontece com os tipos de treino, não conseguimos observar diferenças evidentes nas calorias gastas referentes a diferentes tipos de treino, o que parece indicar que estes não têm influência direta nas calorias gastas (verificado no ponto seguinte).
+
+```{r calorias_duracao_sessao_tipo_treino}
+ggplot(gym_ds2, aes(x = Session_Duration..hours., y = Calories_Burned, color = Workout_Type)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Interação entre Duração da Sessão, Calorias Gastas e Tipo de Treino",
+       x = "Duração da Sessão (Horas)",
+       y = "Calorias Gastas") +
+  theme_minimal()
+```
+
+### <span style="color:black;"> **Relação entre Calorias Gastas e o tipo de treino**
+
+Nesta secção vamos estudar a relação entre as calorias gastas e o tipo de treino adotado. Iremos analisar a proveniência de alguns outilers e relacionar os valores médios de calorias gastas nos diferentes tipos de treino.
+
+Numa primeira instância está representado o boxplot das calorias gastas por tipo de treino.
+
+```{r calorias_tipo_treino}
+ggplot(gym_ds2, aes(x = Workout_Type, y = Calories_Burned, fill = Workout_Type)) + 
+  geom_boxplot(outlier.colour = "black") + 
+  labs(title = "Calorias Gastas por Tipo de Treino", x = "Tipo de Treino", y = "Calorias Gastas") +
+  theme_minimal()
+```
+
+Vamos investigar a proveniência dos outilers nos diferentes tipos de treino e tentar averiguar se se trata de algum erro ou não.
+
+#### <span style="color:black;"> **Identificação de Outliers Nas calorias Gastas no Cardio**
+
+```{r outiler_cardio}
+boxplot(Calories_Burned[Workout_Type=="Cardio"], col = "red", main = "Calorias Gastas no Cardio",
+        ylab = "Calorias Gastas (kcal)")$out
+which(Calories_Burned==1625)
+gym_ds2[100,] 
+```
+Mulher com nível de experiência expert, altura de 1.79m (dentro de 5% das mulheres mais altas) com quase 2 horas de tempo de treino e IMC saudável, parece que este outiler não se trata de nenhum erro mas sim de uma conjugação de valores nas variáveis que diferenciam do resto da população.
+
+#### <span style="color:black;"> **Identificação de Outliers Nas calorias Gastas no HIIT**
+
+```{r outiler_hiit}
+boxplot(Calories_Burned[Workout_Type=="HIIT"], col = "green", main = "Calorias Gastas no HIIT",
+        ylab = "Calorias Gastas (kcal)")$out
+which(Calories_Burned %in% c(1646, 1688, 1766))
+gym_ds2[c(91,573, 713),] 
+```
+
+Os outliers tratam-se de 3 homens com nível de experiência avançado, com quase 2 horas de treino, 2 deles com obesidade grau 1 (pode explicar o elevado gasto calórico), 1 deles com uma altura bastante baixa tendo em conta a média e outro bastante alta (1.61m e 1.96m respetivamente). Mais uma vez parece que apenas se trata de uma conjugação menos provável das variáveis e não de um tipo de erro.
+
+#### <span style="color:black;"> **Identificação de Outliers Nas calorias Gastas no treino de Força**
+
+```{r outiler_forca}
+boxplot(Calories_Burned[Workout_Type=="Strength"], col = "blue", main = "Calorias Gastas no treino de Força",
+        ylab = "Calorias Gastas (kcal)")$out
+which(Calories_Burned %in% c(1701, 1725, 1675, 1634, 1598, 1783))
+gym_ds2[c(125, 512, 647, 729, 737, 911),] 
+```
+
+Os outliers tratam-se de 6 homens, todos de nível de experiência avançado, tempos de treino de aproximadamente 2 horas,
+4 deles com obesidade grau 1 e 3 com alturas próximas dos 1.60m (dentro do 5% dos homens mais baixos). Aferimos as mesmas conclusões dos últimos dois sub-tópicos.
+
+#### <span style="color:black;"> **Testes de hipótese relativo ao gasto calórico por tipo de treino**
+
+O Boxplot obtido em cima parece indicar que os valores médios das calorias gastas é igual nos 4 tipos de treinos. Para averiguar isso vamos realizar o seguinte teste de hipótese:
+
+\( H_0: \mu_{\text{Cardio}} = \mu_{\text{HIIT}} = \mu_{\text{Strength}} = \mu_{\text{Yoga}} \) Vs
+\( H_1: \text{Há diferenças no valor médio do gasto calórico dos diferentes tipos de treino} \)
+
+Uma possibilidade é utilizar a ANOVA mas temos de verificar os pressupostos.
+
+Verificar a normalidade:
+
+\( H_0: \text{São proveniente de distribuição normal} \) Vs \( H_1: \text{Não são proveniente de distribuição normal}\)
+
+```{r normalidade_tipos_treino}
+LillieTest(Calories_Burned[Workout_Type=="Cardio"]) #assumimos normalidade para 95%
+LillieTest(Calories_Burned[Workout_Type=="HIIT"]) #assumimos normalidade para 95%
+LillieTest(Calories_Burned[Workout_Type=="Strength"])#assumimos normalidade para 90%
+LillieTest(Calories_Burned[Workout_Type=="Yoga"])#praticamente assumimos normalidade para 90%
+```
+
+Tendo em conta os P_Value obtidos (todos praticamente > 0.01) podemos assumir, para um grau de confiança de 99%, que as distribuições provém de distribuição normal.
+
+Como foi estudado nas sub-secções anteriores, há 6 outilers no treino de força, 3 no HIIt e 1 no cardio.Podemos considerar este número reduzido, tendo em conta as quase 1000 observações. No entanto, temos de ter atenção pois pode influenciar os resultados.
+
+Temos de testar a homogeneidade de variâncias:
+
+\( H_0: \text{var}_{\text{Cardio}} = \text{var}_{\text{HIIT}} = \text{var}_{\text{Strength}} = \text{var}_{\text{Yoga}} \) Vs
+\( H_1: \text{Há diferenças na variância do gasto calórico dos diferentes tipos de treino} \)
+
+```{r variancia_tipos_treino}
+levene.test(Calories_Burned, Workout_Type)
+```
+
+P_value = 0.789 logo aceitamos H0 e assumimos a homogeneidade de variâncias.
+
+Deste modo estão verificados os pressupostos do teste ANOVA que irá ser realizado de seguida:
+
+```{r teste_anova}
+summary(aov(Calories_Burned ~ factor(Workout_Type)))
+```
+
+Obtemos um P_Value de 0.416, ou seja podemos, com um grau de confiança de 95%, aceitar a hipótese nula e concluir que há evidência estatística que os valores médios das calorias gastas são iguais para os 4 diferentes tipos de treino. 
+
+A ANOVA foi utilizada neste caso, no entanto havia alguns outliers que podem condicionar o resultado. Para efeitos demonstrativos e também de confirmação, iremos utilizar a alternativa não paramétrica, o teste de Kruskal-Wallis.
+
+Temos de verificar o pressuposto das populações possuirem a mesma forma:
+
+```{r kruskal_wallis_pressuposto}
+par(mfrow = c(2, 2), mar = c(4, 4, 2, 1))
+
+hist(Calories_Burned[Workout_Type=="Cardio"], col = "skyblue", xlim = c(0, 2100),
+     xlab = "Calorias Gastas", ylim = c(0, 90),
+     main = "Calorias Gastas no Cardio", ylab = "Frequência")
+hist(Calories_Burned[Workout_Type=="Strength"], col = "green", xlim = c(0, 2100),
+     xlab = "Calorias Gastas", ylim = c(0, 90),
+     main = "Calorias Gastas no treino de Força", ylab = "Frequência")
+hist(Calories_Burned[Workout_Type=="HIIT"], col = "red", xlim = c(0, 2100),
+     xlab = "Calorias Gastas", ylim = c(0, 90),
+     main = "Calorias Gastas no HIIT", ylab = "Frequência")
+hist(Calories_Burned[Workout_Type=="Yoga"],  col = "yellow", xlim = c(0, 2100),
+     xlab = "Calorias Gastas", ylim = c(0, 90),
+     main = "Calorias Gastas na Yoga", ylab = "Frequência")
+```
+
+Como podemos verificar pela visualização dos histogramas, as formas das populações são idênticas pelo que podemos utilizar o teste referido.
+
+```{r kruskal_wallis}
+kruskal.test(Calories_Burned, Workout_Type)
+```
+
+Como o P_Value = 0.686 > 0.05, confirma a conclusão do teste anova, para um grau de confiança de 95% há evidência estatística que os valores médios das calorias gastas são iguais para os 4 diferentes tipos de treino. 
+ 
+### <span style="color:black;"> **Relação entre Calorias Gastas e o Nível de Experiência**
+
+Em primeiro lugar irá ser mostrado o Boxplot das Calorias Gastas por Nível de Experiência nos diferentes tipos de treino.
+
+```{r calorias_nivel_exp}
+ggplot(gym_ds2, aes(x = Experience_Level, y = Calories_Burned, fill = Workout_Type)) + 
+  geom_boxplot() + 
+  labs(title = "Calorias Gastas por Nivel de Experiência", x = "Nivel de Experiência", y = "Calorias Gastas") +
+  theme_minimal()
+```
+
+É importante verificar se valores médios de calorias gastas por nível de experiência são iguais nos diferentes tipos de treino.
+
+Tentaremos utilizar a Anova para realizar o seguinte teste para cada nível de experiência:
+
+\( H_0: \mu_{\text{Cardio}} = \mu_{\text{HIIT}} = \mu_{\text{Strength}} = \mu_{\text{Yoga}} \) Vs
+\( H_1: \text{Há diferenças no valor médio do gasto calórico dos diferentes tipos de treino para cada nível de experiência} \)
+
+Pressuposto da normalidade, temos de testar para cada nível de experiência:
+
+\( H_0: \text{São proveniente de distribuição normal} \) Vs \( H_1: \text{Não são proveniente de distribuição normal}\)
+
+
+```{r normalidade_tipos_treino_nivel, results='hide'}
+LillieTest(Calories_Burned[Experience_Level=="Beginner" & Workout_Type=="HIIT"]) #P_Value = 0.63
+LillieTest(Calories_Burned[Experience_Level=="Beginner" & Workout_Type=="Cardio"])#P_Value = 0.002
+LillieTest(Calories_Burned[Experience_Level=="Beginner" & Workout_Type=="Strength"])#P_Value = 0.04
+LillieTest(Calories_Burned[Experience_Level=="Beginner" & Workout_Type=="Yoga"])#P_Value = 0.22
+
+LillieTest(Calories_Burned[Experience_Level=="Intermediate" & Workout_Type=="HIIT"])#P_Value = 0.12
+LillieTest(Calories_Burned[Experience_Level=="Intermediate" & Workout_Type=="Cardio"]) #P_Value = 0.11
+LillieTest(Calories_Burned[Experience_Level=="Intermediate" & Workout_Type=="Strength"])#P_Value = 0.42
+LillieTest(Calories_Burned[Experience_Level=="Intermediate" & Workout_Type=="Yoga"])#P_Value = 0.01
+
+
+LillieTest(Calories_Burned[Experience_Level=="Expert" & Workout_Type=="HIIT"])#P_Value = 0.08
+LillieTest(Calories_Burned[Experience_Level=="Expert" & Workout_Type=="Cardio"]) #P_Value = 0.86
+LillieTest(Calories_Burned[Experience_Level=="Expert" & Workout_Type=="Strength"])#P_Value = 0.76
+LillieTest(Calories_Burned[Experience_Level=="Expert" & Workout_Type=="Yoga"])#P_Value = 0.48
+```
+
+Tendo em conta os valores obtidos nos testes de Lilliefors, podemos assumir que as distriubições são (praticamente todas) provenientes de uma distribuição normal, com grau de confiança de 99%.
+
+Falta verificar o pressuposto da homogeneidade de variâncias para cada nível de experiência:
+
+\( H_0: \text{var}_{\text{Cardio}} = \text{var}_{\text{HIIT}} = \text{var}_{\text{Strength}} = \text{var}_{\text{Yoga}} \) Vs
+\( H_1: \text{Há diferenças na variância do gasto calórico dos diferentes tipos de treino para cada nível de experiência} \)
+
+```{r variancia_tipos_treino_nivel}
+levene.test(Calories_Burned[Experience_Level=="Beginner"], Workout_Type[Experience_Level=="Beginner"])
+levene.test(Calories_Burned[Experience_Level=="Intermediate"], Workout_Type[Experience_Level=="Intermediate"])
+levene.test(Calories_Burned[Experience_Level=="Expert"], Workout_Type[Experience_Level=="Expert"])
+```
+
+Para um grau de confiança de 95%, como os P_Values são superiores a 0.05 podemos confirmar a hipótese nula e confirmar a homogeneidade de variâncias.
+
+Assim sendo estão verificados os pressupostos da ANOVA, vamos utilizá-la para realizar o teste:
+
+```{r anova_tipos_treino_nivel}
+summary(aov(Calories_Burned[Experience_Level=="Beginner"] ~ Workout_Type[Experience_Level=="Beginner"])) #p_value = 0.371
+summary(aov(Calories_Burned[Experience_Level=="Intermediate"] ~ Workout_Type[Experience_Level=="Intermediate"])) #p_value = 0.15
+summary(aov(Calories_Burned[Experience_Level=="Expert"] ~ Workout_Type[Experience_Level=="Expert"])) #p_value = 0.271
+```
+
+Como os três P_Values são superiores a 0.05 podemos confirmar a hipótese nula e afirmar que há evidência estatística que comprova que o valor médio de calorias gastas por tipo de treino é igual nos 3 níveis de experiência.
+
+Assim sendo, podemos fazer apenas o boxplot das calorias gastas por nível de experiência, sem considerarmos as diferenças entre os diferentes tipos de treino.
+
+
+```{r boxplot_calorias_nivel}
+ggplot(gym_ds2, aes(x = Experience_Level, y = Calories_Burned, fill = Experience_Level)) + 
+  geom_boxplot() + 
+  labs(title = "Calorias Gastas por Nivel de Experiência", x = "Nivel de Experiência", y = "Calorias Gastas") +
+  theme_minimal()+
+  scale_fill_manual(values = c("green", "yellow", "red"))
+```
+
+Queremos averiguar se os valores médios de Calorias Gastas são os mesmos independentemente do nível de Experiência. O gráfico dá a entender que há diferenças significativas mas vamos realizar o seguinte teste:
+
+\( H_0: \mu_{\text{Iniciante}} = \mu_{\text{Intermédio}} = \mu_{\text{Avançado}}\) Vs
+\( H_1: \text{Há diferenças no valor médio do gasto calórico dos diferentes níveis de experiência} \)
+
+Verificar os pressupostos da ANOVA (normalidade e homogeneidade de variâncias):
+
+```{r anova_calorias_nivel}
+LillieTest(Calories_Burned[Experience_Level=="Beginner"])#duvidas na normalidade
+LillieTest(Calories_Burned[Experience_Level=="Intermediate"]) #assumimos normalidade para GC de 95%
+LillieTest(Calories_Burned[Experience_Level=="Expert"])#assumimos normalidade para GC de 95%
+
+levene.test(Calories_Burned, factor(Experience_Level)) #p_value = 4.725e-16 
+```
+
+O teste da normalidadde alerta sobre a distribuição do nível de experiência iniciante não ser proveniente de distribuição normal. Como P_Value = 0.001 < 0.05 não podemos assumir a normalidade da distribuição para um GC de 95%. No entanto ao realizar o teste de homogeneidade das variâncias obtemos um p_value de 4.725e-16, o que indica com clareza que este pressuposto é violado e por isso teremos de recorrer à alternativa não paramétrica - teste de Kruskal-Wallis.
+
+Verifica-se o pressuposto das formas das distribuições ser semelhante através da adição dos diferentes histogramas:
+
+```{r kruskal_wallis_pressuposto2}
+hist(Calories_Burned[Experience_Level=="Beginner"], col = "green", xlim = c(200, 1900),
+     xlab = "Calorias Gastas", ylim = c(0, 120),
+     main = "Calorias Gastas por Nivel de Experiência")
+hist(Calories_Burned[Experience_Level=="Intermediate"], add = T, col = "yellow")
+hist(Calories_Burned[Experience_Level=="Expert"], add = T, col = "red")
+legend("topright", 
+       legend = c("Beginner", "Intermediate", "Expert"), 
+       fill = c("green","yellow", "red"), 
+       border = "black",
+       title = "Nivel de Experiência")
+```
+
+As formas apresentadas são razoavelmente semelhantes, logo vamos realizar o teste:
+
+```{r kruskal_wallis2}
+kruskal.test(Calories_Burned, Experience_Level)
+```
+
+Obtemos um P_Value de 2.2e-16 < 0.05 logo, para um grau de confiança de 95%, rejeitamos H0 e concluimos que há diferenças nos valores médios de calorias gastas por nível de experiência (como suspeitavamos).
+
+Podemos utilizar um teste de wilcox para perceber onde residem as diferenças:
+
+```{r pairwise_wilcox}
+pairwise.wilcox.test(Calories_Burned, Experience_Level)
+```
+Concluimos que há diferenças claras entre os 3 grupos considerados, sem conseguirmos distinguir com clareza onde pois os 3 p_values são muito pequenos (2e-16).
+
+# <span style="color:black;"> **Conclusão**
+
+Neste relatório foi possível averiguar de forma clara como estava composta a amostra inicial para as diferentes variáveis. Através da construção de gráficos adequados aferimos sobre a distribuição das observações por género, por altura, alturas em função do género, nível de experiência por género e proporção dos mesmos, tipos de treino, duração da sessão por tempo de treino e por nível de experiência, IMC.
+Foi estudada a relação entre a variável resposta (Calorias Gastas) e a percentagem de gordura, o peso, género, duração da sessão, tipo de treino e nível de experiência.
+
+Foram retiradas algumas conclusões interessantes sobre  os dados estudados. Percebeu-se que a proporção do nível de experiência é idêntica nos dois géneros, e que o tipo de treino mais comum é o treino de força nos homens e o cardio nas mulheres. Percebemos ainda que o yoga é mais praticado por homens do que por mulheres, e também que os utilizadores experientes treinam apenas entre 1.5h e 2h enquanto os outros níveis de experiência entre 0.5h e 1.5h.
+
+Alguns testes estatísticos permitiram concluir que, para os respetivos graus de confiança, o valor médio da duração do treino é igual em todos os tipos de treino, o IMC da amostra está dentro do peso adequado mas próximo do sobrepeso, o nível de experiência e a duração do treino têm muita influência nas calorias gastas, no entanto o mesmo não acontece para o tipo de treino adotado.  
+
+De uma forma geral a análise desta base de dados ajudou a perceber que os dados antropomórficos dos membros do ginásio assim como a sua experiência no mundo do fitness determinam quão eficiente pode ser o treino realizado e consequentemente as calorias gastas no mesmo. Foi também bastante útil para a consolidação de aprendizagens obtidas nas diferentes unidades curriculares assim como desenvolvimento das capacidades do tratamento de informação com auxílio do software R. Posto isto confirmamos que os objetivos propostos na introdução foram cumpridos.
+
+```{r detach}
+detach(gym_ds2)
+```
+
+
+
