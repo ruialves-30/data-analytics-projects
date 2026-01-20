@@ -1,0 +1,377 @@
+This appendix contains R and Python code used to perform the survival analysis presented in this document.
+
+
+R code to fit Kaplan-Meier Estimator
+
+
+# Midpoint imputation for interval-censored data
+library(dplyr)
+
+inputted.data <- bcint %>%
+  mutate(
+    rec.time = ifelse(is.finite(right_rec),
+                      (left_rec + right_rec) / 2,
+                      left_rec),
+    status = ifelse(is.finite(right_rec), 1, 0)
+  )
+
+# Kaplan--Meier estimation using midpoint-imputed data
+library(survival)
+km <- survfit(Surv(rec.time, status) ~ 1, data = inputted.data)
+
+# Survival probabilities at yearly time points (1 to 7 years)
+summary(km, times = 365 * 1:7)$surv
+
+# Plot estimated survival curve
+plot(km, xlab = "Time", ylab = "Survival Probability")
+
+
+Python code to fit Kaplan-Meier Estimator
+km_py
+
+
+# Midpoint imputation for interval-censored data
+bcint["rec_time"] = np.where(
+    bcint["right_rec"].notna(),
+    (bcint["left_rec"] + bcint["right_rec"]) / 2,
+    bcint["left_rec"]
+)
+
+
+
+
+# Define event indicator: 1 = event observed within interval, 
+0 = right-censored
+
+bcint["status"] = np.where(bcint["right_rec"].notna(), 1, 0)
+
+# Fit Kaplan-Meier estimator using midpoint-imputed data
+from lifelines import KaplanMeierFitter
+kmf = KaplanMeierFitter()
+kmf.fit(durations=bcint["rec_time"], 
+event_observed=bcint["status"])
+
+# Predict survival probabilities at yearly time points 
+(1 to 7 years)
+time_points = [365 * i for i in range(1, 8)]
+surv_probs = kmf.predict(time_points)
+
+# Plot estimated survival curve
+import matplotlib.pyplot as plt
+kmf.plot_survival_function()
+plt.title("Kaplan--Meier Estimate")
+plt.xlabel("Time")
+plt.ylabel("Survival Probability")
+plt.show()
+
+
+
+
+R code to fit Turnbull Estimator
+tb_r
+
+
+# If Icens package is missing, run:
+if (!require("BiocManager", quietly = TRUE)) 
+install.packages("BiocManager")
+BiocManager::install("Icens")
+
+library(interval)
+turnbull <- icfit(Surv(left_rec, right_rec, type = "interval2")
+~ 1, data=bcint)
+plot(turnbull, XLAB ="Time", YLAB="Survival")
+
+
+Python code to fit Turnbull Estimator
+tb_py
+
+
+# Fill missing right bounds (right-censored) with a large number
+bcint["right_rec_filled"] = bcint["right_rec"].fillna(9999999)
+
+# Filter valid intervals (left < right)
+bcint_interval = bcint[bcint["left_rec"] < bcint["right_rec_filled"]]
+
+# Extract left and right bounds
+left = bcint_interval["left_rec"].values
+right = bcint_interval["right_rec_filled"].values
+intervals = np.column_stack((left, right))
+
+# Fit Turnbull estimator with SurPyval
+from surpyval import Turnbull
+tb_model = Turnbull.fit(x=intervals)
+
+# Predict survival probabilities at yearly time points
+time_points = [365 * i for i in range(1, 8)]
+surv_probs = tb_model.sf(time_points)
+
+
+
+Python code to fit Cox Regression Model
+cox_py
+
+
+# Encode categorical variables as dummies
+bcint_dummies = pd.get_dummies(
+bcint, columns=["menopause", "hormone", "grade"], drop_first=True
+)
+
+from lifelines import CoxPHFitter
+# Fit Cox model with midpoint-imputed times
+cph = CoxPHFitter()
+cph.fit(
+bcint_dummies[[
+"rec_time", "status", "age", "size", "nodes", "prog_recp",
+"estrg_recp", "menopause_2", "hormone_2", "grade_2", 
+"grade_3"]], duration_col="rec_time", event_col="status"
+)
+
+# Display summary
+summary_df = cph.summary.round(4)
+print(summary_df)
+
+
+R code to fit Cox Regression Model
+cox_r
+
+
+# Fit Cox model with midpoint-imputed times
+library(survival)
+cox.midpoint <- coxph(Surv(rec.time, status) ~ age + menopause +
+hormone + size + grade + nodes + prog_recp + estrg_recp,
+data = interval_data)
+print(cox.midpoint)
+
+
+Python code to fit AFT Regression Models
+aft_py
+
+
+#Parametric Regression with interval censoring
+from lifelines import WeibullAFTFitter, LogNormalAFTFitter,
+LogLogisticAFTFitter
+
+df_ic = bcint_dummies[[
+"age", "size", "nodes", "prog_recp", "estrg_recp",
+"menopause_2", "hormone_2", "grade_2", "grade_3"
+]].copy()
+df_ic["left_rec"] = bcint["left_rec"].to_numpy()
+df_ic["right_rec"] = bcint["right_rec"].fillna(np.inf).to_numpy()
+
+fitters = 
+"weibull": WeibullAFTFitter(),
+"lognormal": LogNormalAFTFitter(),
+"loglogistic": LogLogisticAFTFitter(),
+
+fitted = 
+
+for name, aft in fitters.items():
+aft.fit_interval_censoring(
+df_ic,
+lower_bound_col="left_rec",
+upper_bound_col="right_rec"
+)
+
+fitted[name] = aft
+print(f"name AIC = aft.AIC_:.3f")
+best_name = min(fitted, key=lambda k: fitted[k].AIC_)
+
+best_model = fitted[best_name]
+print(f"\nBest interval-censored AFT (by AIC): best_name, 
+AIC = best_model.AIC_:.3f")
+
+aft_sum = best_model.summary.copy()
+aft_sum["time_ratio"] = np.exp(aft_sum["coef"])
+tbl = aft_sum.loc[
+aft_sum.index.get_level_values(0).str.startswith("mu_"),
+["coef", "se(coef)", "z", "p", "time_ratio"]
+]
+print(tbl.round(4))
+
+
+
+R code to fit AFT Regression Models
+aft_r
+
+
+#using icenReg
+library(icenReg)
+fit_ic_ln <- ic_par(Surv(left_rec, right_rec, type = "interval2")
+~ age + menopause + hormone + size + grade + nodes +
+prog_recp + estrg_recp, data = interval_data,
+model = "ph", dist = "lnorm")
+summary(fit_ic_ln)
+
+#or using flexsurv
+library(flexsurv)
+flex.lnorm <- flexsurvreg(
+formula = Surv(left_rec, right_rec, type = "interval2") ~
+age + menopause + hormone + size + grade + nodes +
+prog_recp + estrg_recp,
+data = bcint,
+dist = "lnorm"
+)
+
+
+R code to fit a Survival Tree
+tree_r
+
+
+library(LTRCtrees)
+bcint1 <- bcint
+bcint1$right_rec[is.na(bcint1$right_rec)] <- Inf
+Ctree <- ICtree(Surv(left_rec, right_rec, type = "interval2") ~
+age + menopause + hormone + size + grade + nodes +
+prog_recp + estrg_recp, data = bcint1)
+
+# Plot the fitted tree
+plot(Ctree)
+
+
+Python code to fit a Survival Tree (through AFT)
+tree_py
+
+
+# prepare interval bounds
+y_lower = bcint["left_rec"].to_numpy(dtype=np.float32)
+y_upper = bcint["right_rec"].fillna(np.inf).to_numpy(dtype=np.float32)
+
+# design matrix with dummies
+X = pd.get_dummies(
+bcint[["age","menopause","hormone","size","grade",
+"nodes","prog_recp","estrg_recp"]],
+columns=["menopause","hormone","grade"],
+drop_first=True
+).astype(np.float32)
+
+# train/validation split
+X_train, X_valid, l_train, l_valid, u_train, u_valid =
+train_test_split(X, y_lower, y_upper, test_size=0.25,
+random_state=42)
+
+# DMatrix with interval labels
+dtrain = xgb.DMatrix(X_train)
+dtrain.set_float_info(’label_lower_bound’, l_train)
+dtrain.set_float_info(’label_upper_bound’, u_train)
+
+# single tree parameters
+params_single = dict(
+objective=’survival:aft’,
+eval_metric=[’aft-nloglik’,’interval-regression-accuracy’],
+tree_method=’hist’,
+max_depth=3,
+min_child_weight=20,
+learning_rate=1.0,
+aft_loss_distribution=’normal’,
+aft_loss_distribution_scale=1.0
+)
+
+# train one tree
+bst_single = xgb.train(
+params_single, dtrain,
+num_boost_round=1
+)
+
+
+R code to fit a Survival Random Forest
+rf_r
+
+
+library(ICcforest)
+bcint2 <- bcint
+bcint2$right_rec[is.na(bcint2$right_rec)] <- 9999999
+fit_rf <- ICcforest(Surv(left_rec, right_rec, type = "interval2") 
+~ age + menopause + hormone + size + grade + nodes + 
+prog_recp + estrg_recp, data = bcint2, ntree = 500L)
+fit_rf
+
+plot(gettree(fit_rf, tree = 50L))
+
+
+R code to fit a XGBoost Survival Model (through AFT)
+xgb_r
+
+
+library(xgboost)
+# Prepare interval-censored labels
+label_lower <- bcint$left_rec
+label_upper <- bcint$right_rec
+label_upper[is.na(label_upper)] <- 1e9 # substitute Inf
+
+# Prepare design matrix
+X <- model.matrix(~ age + menopause + hormone + size + grade +
+nodes + prog_recp + estrg_recp, data = bcint2)[, -1]
+
+# Create XGBoost DMatrix
+dtrain <- xgb.DMatrix(data = X)
+setinfo(dtrain, "label_lower_bound", label_lower)
+setinfo(dtrain, "label_upper_bound", label_upper)
+
+# Define model parameters
+params <- list(
+objective = "survival:aft",
+eval_metric = "aft-nloglik",
+aft_loss_distribution = "normal", # or "logistic", "extreme"
+aft_loss_distribution_scale = 1.0,
+tree_method = "hist"
+)
+
+# Train the model
+bst <- xgb.train(
+params = params,
+data = dtrain,
+nrounds = 100
+)
+
+# Make predictions
+preds <- predict(bst, newdata = dtrain)
+# Create results dataframe
+results <- data.frame(
+left = label_lower,
+right = label_upper,
+predicted = preds
+)
+
+
+
+Python code to fit a XGBoost Survival Model (through AFT)
+xgb_py
+
+
+#Boosting
+params = dict(
+objective=’survival:aft’,
+eval_metric=’aft-nloglik’, # validation for log-likelihood aft
+tree_method=’hist’,
+max_depth=4, min_child_weight=10,
+subsample=0.8, colsample_bytree=0.8,
+learning_rate=0.05,
+aft_loss_distribution=’normal’,
+aft_loss_distribution_scale=1.0
+)
+bst = xgb.train(
+params, dtrain,
+num_boost_round=1000,
+evals=[(dvalid, ’valid’)],
+callbacks=[xgb.callback.EarlyStopping(
+rounds=50, save_best=True,
+data_name=’valid’, metric_name=’aft-nloglik’)],
+verbose_eval=25
+)
+
+# Variable Importance
+imp = bst.get_score(importance_type=’gain’)
+# Root Split Frequency
+df = bst.trees_to_dataframe()
+roots = df[df["Node"] == 0]
+freq = roots["Feature"].value_counts(normalize=True) * 100
+
+# New observation prediction
+x_new = pd.DataFrame(...)
+pred_loc = bst.predict(xgb.DMatrix(x_new),
+iteration_range=(0, bst.best_iteration+1))[0]
+t_median = np.exp(pred_loc)
+
+
+
+\endcomment
